@@ -47,8 +47,11 @@ def _parse_op(raw: str) -> dict:
             err.print(Text("[FAIL] ", style=f"bold {RED}") + Text(f"op param must be key=value, got: {part!r}", style=RED))
             raise typer.Exit(1)
         key, val = part.split("=", 1)
+        list_keys = {"cols", "parts", "out_cols", "breaks", "by", "on"}
         if "," in val:
             op[key] = val.split(",")
+        elif key in list_keys:
+            op[key] = [val]
         elif val.lstrip("-").isdigit():
             op[key] = int(val)
         elif val.replace(".", "", 1).lstrip("-").isdigit():
