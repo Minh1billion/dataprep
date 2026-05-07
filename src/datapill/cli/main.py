@@ -5,6 +5,7 @@ from .cmd_artifact import app as artifact_app
 from .cmd_ingest import app as ingest_app
 from .cmd_preprocess import app as preprocess_app
 from .cmd_profile import app as profile_app
+from .cmd_export import app as export_app
 
 app = typer.Typer(
     name="datapill",
@@ -16,6 +17,7 @@ app.add_typer(ingest_app, name="ingest")
 app.add_typer(artifact_app, name="artifact")
 app.add_typer(preprocess_app, name="preprocess")
 app.add_typer(profile_app, name="profile")
+app.add_typer(export_app, name="export")
 
 def version_callback(value: bool):
     if value:

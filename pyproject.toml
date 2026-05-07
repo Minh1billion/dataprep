@@ -55,6 +55,7 @@ dependencies = [
     "scipy>=1.11.0",
     "fastembed>=0.3.0",
     "pytz>=2024.1",
+    "playwright>=1.44.0",
 ]
 
 [project.optional-dependencies]
