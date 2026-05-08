@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any, AsyncGenerator
@@ -11,6 +9,7 @@ from ...core.events import EventType, ProgressEvent
 from ...storage.artifact_store import Artifact
 from ..base import ExecutionPlan, Pipeline, ValidationResult
 from ...utils.loader import load_dataframe
+from .template import PROFILE_HTML_TEMPLATE
 
 _VALID_PARENTS = {"ingest", "preprocess", "profile"}
 
@@ -25,6 +24,196 @@ _FORMAT_EXT = {
     "excel": "xlsx",
     "html": "html",
 }
+
+
+def _build_profile_html(profile_result: dict[str, Any], parent: Any) -> str:
+    summary = profile_result.get("summary", {})
+    columns = profile_result.get("columns", [])
+    correlations = profile_result.get("correlations", [])
+    warnings = profile_result.get("warnings", [])
+    col_types = summary.get("column_types", {})
+
+    rows_html = ""
+    for cp in columns:
+        null_pct = cp.get("null_pct", 0) or 0
+        null_color = (
+            "var(--red)" if null_pct > 0.3
+            else ("var(--yellow)" if null_pct > 0.1 else "var(--text-muted)")
+        )
+        mean_or_top = ""
+        if cp.get("mean") is not None:
+            try:
+                mean_or_top = f"{float(cp['mean']):.4g}"
+            except (TypeError, ValueError):
+                mean_or_top = str(cp["mean"])
+        elif cp.get("top_values"):
+            top = cp["top_values"]
+            if top:
+                mean_or_top = str(top[0].get("value", ""))[:40]
+
+        col_warns = cp.get("warnings", [])
+        warn_count = len(col_warns)
+        if any(w.get("severity") == "error" for w in col_warns):
+            warn_cell = f'<span class="badge badge-error">{warn_count}</span>'
+        elif warn_count > 0:
+            warn_cell = f'<span class="badge badge-warn">{warn_count}</span>'
+        else:
+            warn_cell = '<span class="badge badge-ok">·</span>'
+
+        dtype_label = cp.get("dtype_inferred", cp.get("dtype_physical", ""))
+        null_bar_w = round(null_pct * 100, 1)
+
+        rows_html += f"""
+                    <tr class="col-row">
+                        <td class="col-name">{cp.get("name","")}</td>
+                        <td><span class="dtype-chip">{dtype_label}</span></td>
+                        <td>
+                            <div class="null-bar-wrap">
+                                <div class="null-bar-fill" style="width:{null_bar_w}%;background:{null_color}"></div>
+                                <span style="color:{null_color}">{null_pct*100:.1f}%</span>
+                            </div>
+                        </td>
+                        <td class="num">{cp.get("distinct_count","")}</td>
+                        <td class="num">{mean_or_top}</td>
+                        <td style="text-align:center">{warn_cell}</td>
+                    </tr>"""
+
+    corr_rows_html = ""
+    corr_chart_labels = []
+    corr_chart_values = []
+    corr_chart_colors = []
+    for pair in sorted(correlations, key=lambda x: abs(x.get("value", 0)), reverse=True):
+        val = pair.get("value", 0)
+        val_color = (
+            "var(--red)" if abs(val) >= 0.8
+            else ("var(--yellow)" if abs(val) >= 0.5 else "var(--text)")
+        )
+        corr_rows_html += f"""
+                    <tr>
+                        <td class="col-name">{pair.get("col_a","")}</td>
+                        <td class="col-name">{pair.get("col_b","")}</td>
+                        <td><span class="dtype-chip">{pair.get("method","")}</span></td>
+                        <td class="num" style="color:{val_color};font-weight:600">{val:+.4f}</td>
+                    </tr>"""
+        corr_chart_labels.append(f"{pair.get('col_a','')} × {pair.get('col_b','')}")
+        corr_chart_values.append(round(val, 4))
+        alpha = min(abs(val) + 0.25, 1.0)
+        if val >= 0:
+            corr_chart_colors.append(f"rgba(220,38,38,{alpha:.2f})")
+        else:
+            corr_chart_colors.append(f"rgba(79,70,229,{alpha:.2f})")
+
+    warn_rows_html = ""
+    sev_class = {"error": "badge-error", "warn": "badge-warn", "info": "badge-info"}
+    for sev in ("error", "warn", "info"):
+        for w in [x for x in warnings if x.get("severity") == sev]:
+            col = w.get("column", "")
+            col_label = col if col and col != "__dataset__" else "(dataset)"
+            warn_rows_html += f"""
+                        <tr>
+                            <td><span class="badge {sev_class.get(sev,'')}">{sev.upper()}</span></td>
+                            <td class="col-name">{col_label}</td>
+                            <td style="color:var(--text-muted)">{w.get("code","")}</td>
+                        </tr>"""
+
+    hist_entries = []
+    for nc in columns:
+        if nc.get("dtype_inferred") != "numeric":
+            continue
+        hist = nc.get("histogram")
+        if not hist or not isinstance(hist, dict):
+            continue
+        bins = hist.get("bins", [])
+        counts = hist.get("counts", [])
+        if not bins or not counts:
+            continue
+        labels = [f"{b:.3g}" for b in bins[:-1]] if len(bins) > 1 else [str(b) for b in bins]
+        hist_entries.append({"name": nc.get("name", ""), "labels": labels, "counts": counts})
+        if len(hist_entries) >= 8:
+            break
+
+    corr_section_html = ""
+    if correlations:
+        corr_section_html = f"""
+  <div id="correlations" class="section">
+    <div class="section-title">Correlations ({len(correlations)} pairs)</div>
+    <div class="chart-card anim anim-3" style="margin-bottom:20px">
+      <div class="chart-card-title">Correlation strength (top pairs)</div>
+      <div class="chart-wrap" style="height:max(160px, min({len(corr_chart_labels[:15])*28}px, 340px))">
+        <canvas id="corrChart"></canvas>
+      </div>
+    </div>
+    <div class="table-wrap anim">
+      <table>
+        <thead><tr><th>Col A</th><th>Col B</th><th>Method</th><th style="text-align:right">r</th></tr></thead>
+        <tbody>{corr_rows_html}</tbody>
+      </table>
+    </div>
+  </div>"""
+
+    warn_section_html = ""
+    if warnings:
+        warn_section_html = f"""
+  <div id="warnings" class="section">
+    <div class="section-title">Warnings ({len(warnings)})</div>
+    <div class="table-wrap anim">
+      <table>
+        <thead><tr><th>Severity</th><th>Column</th><th>Code</th></tr></thead>
+        <tbody>{warn_rows_html}</tbody>
+      </table>
+    </div>
+  </div>"""
+
+    n_errors = sum(1 for w in warnings if w.get("severity") == "error")
+    n_warns  = sum(1 for w in warnings if w.get("severity") == "warn")
+
+    warn_value_color = (
+        "var(--red)" if n_errors
+        else ("var(--yellow)" if n_warns else "var(--green)")
+    )
+    null_total_color = (
+        "var(--red)" if (summary.get("total_null_pct", 0) or 0) > 0.3
+        else "var(--text)"
+    )
+
+    corr_nav = "<a class='nav-item' href='#correlations'><span class='nav-dot'></span>Correlations</a>" if correlations else ""
+    warn_nav = "<a class='nav-item' href='#warnings'><span class='nav-dot'></span>Warnings</a>" if warnings else ""
+
+    rows_html_final = rows_html if rows_html else '<tr><td colspan="6" class="empty">no columns</td></tr>'
+
+    return PROFILE_HTML_TEMPLATE.format(
+        run_id=parent.run_id,
+        parent_run_id=parent.parent_run_id or "-",
+        corr_nav=corr_nav,
+        warn_nav=warn_nav,
+        n_rows=f"{summary.get('n_rows', 0):,}",
+        n_columns=summary.get("n_columns", 0),
+        n_columns_label=len(columns),
+        memory_mb=f"{summary.get('memory_mb', 0):.1f}",
+        null_total_color=null_total_color,
+        total_null_pct=f"{(summary.get('total_null_pct', 0) or 0)*100:.1f}%",
+        duplicate_pct=f"{(summary.get('duplicate_pct', 0) or 0)*100:.1f}%",
+        warn_value_color=warn_value_color,
+        n_warnings=len(warnings),
+        n_errors=n_errors,
+        n_warns=n_warns,
+        rows_html=rows_html_final,
+        corr_section_html=corr_section_html,
+        warn_section_html=warn_section_html,
+        null_chart_labels=json.dumps([c.get("name", "") for c in columns]),
+        null_chart_values=json.dumps([round((c.get("null_pct", 0) or 0) * 100, 2) for c in columns]),
+        col_type_labels=json.dumps(["numeric", "categorical", "datetime", "other"]),
+        col_type_values=json.dumps([
+            col_types.get("numeric", 0),
+            col_types.get("categorical", 0),
+            col_types.get("datetime", 0),
+            col_types.get("other", 0),
+        ]),
+        hist_data_js=json.dumps(hist_entries, default=str),
+        corr_labels_js=json.dumps(corr_chart_labels[:15]),
+        corr_values_js=json.dumps(corr_chart_values[:15]),
+        corr_colors_js=json.dumps(corr_chart_colors[:15]),
+    )
 
 
 class ExportPipeline(Pipeline):
@@ -167,166 +356,7 @@ class ExportPipeline(Pipeline):
                 resolved_path.write_text(json.dumps(profile_result, indent=2, default=str))
 
             elif self.format == "html":
-                summary = profile_result.get("summary", {})
-                columns = profile_result.get("columns", [])
-                correlations = profile_result.get("correlations", [])
-                warnings = profile_result.get("warnings", [])
-
-                col_types = summary.get("column_types", {})
-
-                rows_html = ""
-                for cp in columns:
-                    null_pct = cp.get("null_pct", 0) or 0
-                    null_color = "#d13212" if null_pct > 0.3 else ("#f89c24" if null_pct > 0.1 else "#687078")
-                    mean_or_top = ""
-                    if cp.get("mean") is not None:
-                        try:
-                            mean_or_top = f"{float(cp['mean']):.4g}"
-                        except (TypeError, ValueError):
-                            mean_or_top = str(cp["mean"])
-                    elif cp.get("top_values"):
-                        top = cp["top_values"]
-                        if top:
-                            mean_or_top = str(top[0].get("value", ""))[:40]
-
-                    col_warns = cp.get("warnings", [])
-                    warn_count = len(col_warns)
-                    if any(w.get("severity") == "error" for w in col_warns):
-                        warn_cell = f'<span style="color:#d13212;font-weight:500">{warn_count}</span>'
-                    elif warn_count > 0:
-                        warn_cell = f'<span style="color:#f89c24;font-weight:500">{warn_count}</span>'
-                    else:
-                        warn_cell = '<span style="color:#aab7b8">-</span>'
-
-                    rows_html += f"""
-                    <tr>
-                        <td style="font-weight:500;color:#16191f">{cp.get("name","")}</td>
-                        <td style="color:#687078">{cp.get("dtype_inferred", cp.get("dtype_physical",""))}</td>
-                        <td style="color:{null_color}">{null_pct*100:.1f}%</td>
-                        <td style="color:#687078">{cp.get("distinct_count","")}</td>
-                        <td style="color:#687078">{mean_or_top}</td>
-                        <td style="text-align:center">{warn_cell}</td>
-                    </tr>"""
-
-                corr_rows_html = ""
-                for pair in sorted(correlations, key=lambda x: abs(x.get("value", 0)), reverse=True):
-                    val = pair.get("value", 0)
-                    val_color = "#d13212" if abs(val) >= 0.8 else ("#f89c24" if abs(val) >= 0.5 else "#16191f")
-                    corr_rows_html += f"""
-                    <tr>
-                        <td>{pair.get("col_a","")}</td>
-                        <td>{pair.get("col_b","")}</td>
-                        <td style="color:#687078">{pair.get("method","")}</td>
-                        <td style="color:{val_color};font-weight:500">{val:+.4f}</td>
-                    </tr>"""
-
-                warn_rows_html = ""
-                sev_color = {"error": "#d13212", "warn": "#f89c24", "info": "#0073bb"}
-                for sev in ("error", "warn", "info"):
-                    for w in [x for x in warnings if x.get("severity") == sev]:
-                        col = w.get("column", "")
-                        col_label = col if col and col != "__dataset__" else "(dataset)"
-                        warn_rows_html += f"""
-                        <tr>
-                            <td style="color:{sev_color.get(sev,'#687078')};font-weight:500;text-transform:uppercase;font-size:11px">{sev}</td>
-                            <td style="color:#0073bb">{col_label}</td>
-                            <td style="color:#687078">{w.get("code","")}</td>
-                        </tr>"""
-
-                html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>datapill profile - {parent.run_id}</title>
-<style>
-  *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: -apple-system, "Segoe UI", sans-serif; font-size: 14px; color: #16191f; background: #f2f3f3; }}
-  .page {{ max-width: 1080px; margin: 0 auto; padding: 32px 24px; }}
-  h1 {{ font-size: 20px; font-weight: 600; color: #16191f; margin-bottom: 4px; }}
-  .run-id {{ font-size: 12px; color: #687078; font-family: monospace; margin-bottom: 28px; }}
-  .section {{ background: #fff; border: 1px solid #eaeded; border-radius: 4px; margin-bottom: 20px; }}
-  .section-header {{ padding: 14px 20px; border-bottom: 1px solid #eaeded; font-weight: 600; font-size: 13px; color: #16191f; letter-spacing: 0.02em; }}
-  .section-body {{ padding: 20px; }}
-  .stat-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }}
-  .stat {{ background: #f8f8f8; border: 1px solid #eaeded; border-radius: 4px; padding: 14px 16px; }}
-  .stat-label {{ font-size: 11px; color: #687078; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }}
-  .stat-value {{ font-size: 20px; font-weight: 600; color: #16191f; }}
-  .stat-sub {{ font-size: 11px; color: #687078; margin-top: 2px; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
-  th {{ text-align: left; padding: 8px 12px; color: #687078; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 2px solid #eaeded; }}
-  td {{ padding: 9px 12px; border-bottom: 1px solid #f2f3f3; }}
-  tr:last-child td {{ border-bottom: none; }}
-  .badge {{ display: inline-block; padding: 2px 8px; border-radius: 2px; font-size: 11px; font-weight: 500; }}
-  .badge-numeric {{ background: #e8f4fb; color: #0073bb; }}
-  .badge-categorical {{ background: #f3ebff; color: #6b3fd4; }}
-  .badge-datetime {{ background: #eafaf1; color: #1d8348; }}
-  .empty {{ color: #aab7b8; font-size: 13px; padding: 16px 0; }}
-</style>
-</head>
-<body>
-<div class="page">
-  <h1>Profile Report</h1>
-  <div class="run-id">run {parent.run_id} &nbsp;·&nbsp; parent {parent.parent_run_id or "-"}</div>
-
-  <div class="section">
-    <div class="section-header">Dataset</div>
-    <div class="section-body">
-      <div class="stat-grid">
-        <div class="stat">
-          <div class="stat-label">Rows</div>
-          <div class="stat-value">{summary.get("n_rows", 0):,}</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Columns</div>
-          <div class="stat-value">{summary.get("n_columns", 0)}</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Memory</div>
-          <div class="stat-value">{summary.get("memory_mb", 0):.2f}</div>
-          <div class="stat-sub">MB</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Null %</div>
-          <div class="stat-value">{summary.get("total_null_pct", 0)*100:.2f}%</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Duplicate %</div>
-          <div class="stat-value">{summary.get("duplicate_pct", 0)*100:.2f}%</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Column types</div>
-          <div class="stat-value" style="font-size:13px;margin-top:4px">
-            <span class="badge badge-numeric">{col_types.get("numeric", 0)} numeric</span><br style="margin:3px 0">
-            <span class="badge badge-categorical" style="margin-top:4px">{col_types.get("categorical", 0)} categorical</span><br style="margin:3px 0">
-            <span class="badge badge-datetime" style="margin-top:4px">{col_types.get("datetime", 0)} datetime</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-header">Columns</div>
-    <div class="section-body" style="padding:0">
-      <table>
-        <thead>
-          <tr>
-            <th>Column</th><th>Type</th><th>Null %</th><th>Distinct</th><th>Mean / top value</th><th style="text-align:center">Warns</th>
-          </tr>
-        </thead>
-        <tbody>{rows_html if rows_html else f'<tr><td colspan="6" class="empty">no columns</td></tr>'}</tbody>
-      </table>
-    </div>
-  </div>
-
-  {'<div class="section"><div class="section-header">Correlations</div><div class="section-body" style="padding:0"><table><thead><tr><th>Col A</th><th>Col B</th><th>Method</th><th>r</th></tr></thead><tbody>' + corr_rows_html + '</tbody></table></div></div>' if correlations else ''}
-
-  {'<div class="section"><div class="section-header">Warnings</div><div class="section-body" style="padding:0"><table><thead><tr><th>Severity</th><th>Column</th><th>Code</th></tr></thead><tbody>' + warn_rows_html + '</tbody></table></div></div>' if warnings else ''}
-
-</div>
-</body>
-</html>"""
+                html = _build_profile_html(profile_result, parent)
                 resolved_path.write_text(html, encoding="utf-8")
 
         else:

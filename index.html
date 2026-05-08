@@ -54,8 +54,10 @@
   .sidebar { width: 260px; flex-shrink: 0; background: var(--aws-sidebar-bg); border-right: 1px solid var(--aws-sidebar-border); position: sticky; top: var(--aws-header-height); height: calc(100vh - var(--aws-header-height)); overflow-y: auto; padding: 16px 0 32px; }
   .sidebar::-webkit-scrollbar { width: 4px; }
   .sidebar::-webkit-scrollbar-thumb { background: var(--aws-border); border-radius: 4px; }
-  .sidebar-section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--aws-text-muted); padding: 12px 20px 4px; }
+  .sidebar-section-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .9px; color: #16191f; padding: 18px 20px 6px; border-top: 2px solid var(--aws-orange); margin-top: 8px; }
+  .sidebar-section-label:first-child { border-top: none; margin-top: 0; padding-top: 8px; }
   .sidebar-item { display: block; padding: 6px 20px 6px 28px; font-size: 13px; color: var(--aws-text-secondary); text-decoration: none; border-left: 3px solid transparent; transition: all .12s; }
+  .sidebar-toplevel { padding-left: 20px; font-size: 13px; font-weight: 700; color: var(--aws-text); letter-spacing: .01em; margin-top: 2px; }
   .sidebar-item:hover { background: var(--aws-sidebar-active); color: var(--aws-blue); border-left-color: var(--aws-orange); }
   .sidebar-item.active { background: var(--aws-sidebar-active); color: var(--aws-blue); border-left-color: var(--aws-orange); font-weight: 600; }
   .sidebar-sub { padding-left: 40px; font-size: 12.5px; }
@@ -184,11 +186,11 @@
     <a href="#quickstart" class="sidebar-item">Quick Start</a>
 
     <div class="sidebar-section-label">CLI Reference</div>
-    <a href="#ingest" class="sidebar-item">datapill ingest</a>
+    <a href="#ingest" class="sidebar-item sidebar-toplevel">datapill ingest</a>
     <a href="#ingest-run" class="sidebar-item sidebar-sub">ingest run</a>
     <a href="#ingest-check" class="sidebar-item sidebar-sub">ingest check</a>
     <a href="#ingest-sources" class="sidebar-item sidebar-sub">ingest sources</a>
-    <a href="#artifact" class="sidebar-item">datapill artifact</a>
+    <a href="#artifact" class="sidebar-item sidebar-toplevel">datapill artifact</a>
     <a href="#artifact-list" class="sidebar-item sidebar-sub">artifact list</a>
     <a href="#artifact-show" class="sidebar-item sidebar-sub">artifact show</a>
     <a href="#artifact-lineage" class="sidebar-item sidebar-sub">artifact lineage</a>
@@ -196,15 +198,18 @@
     <a href="#artifact-purge" class="sidebar-item sidebar-sub">artifact purge</a>
     <a href="#artifact-usage" class="sidebar-item sidebar-sub">artifact usage</a>
 
-    <a href="#preprocess" class="sidebar-item">datapill preprocess</a>
+    <a href="#preprocess" class="sidebar-item sidebar-toplevel">datapill preprocess</a>
     <a href="#preprocess-run" class="sidebar-item sidebar-sub">preprocess run</a>
     <a href="#preprocess-materialize" class="sidebar-item sidebar-sub">preprocess materialize</a>
     <a href="#preprocess-preview" class="sidebar-item sidebar-sub">preprocess preview</a>
     <a href="#preprocess-ops" class="sidebar-item sidebar-sub">preprocess ops</a>
-    <a href="#profile" class="sidebar-item">datapill profile</a>
+    <a href="#profile" class="sidebar-item sidebar-toplevel">datapill profile</a>
     <a href="#profile-run" class="sidebar-item sidebar-sub">profile run</a>
     <a href="#profile-show" class="sidebar-item sidebar-sub">profile show</a>
     <a href="#profile-warnings" class="sidebar-item sidebar-sub">profile warnings</a>
+    <a href="#export" class="sidebar-item sidebar-toplevel">datapill export</a>
+    <a href="#export-run" class="sidebar-item sidebar-sub">export run</a>
+    <a href="#export-formats" class="sidebar-item sidebar-sub">export formats</a>
     <div class="sidebar-section-label">Connectors</div>
     <a href="#sources" class="sidebar-item">Supported Sources</a>
     <a href="#config-postgres" class="sidebar-item sidebar-sub">PostgreSQL</a>
@@ -887,7 +892,104 @@ confirm? [y/N]:</span> y
     </section>
 
 
-    <section id="sources">
+        <section id="export">
+      <h2>datapill export</h2>
+      <p>Export any artifact produced by <code>ingest</code>, <code>preprocess</code>, or <code>profile</code> to a file.
+      Supports six output formats. All three required inputs can be prompted interactively when omitted.</p>
+    </section>
+
+    <section id="export-run">
+      <h3>export run</h3>
+      <p>Export an artifact to a file. <code>RUN_ID</code>, <code>--format</code>, and <code>--output</code> are optional —
+      omitting any of them triggers an interactive prompt.</p>
+      <div class="code-block"><div class="code-block-header"><span class="code-block-lang">synopsis</span></div>
+      <pre><span class="t-cmd">dp export run</span> [<span class="t-arg">RUN_ID</span>] [<span class="t-flag">--format</span> <span class="t-arg">FMT</span>] [<span class="t-flag">--output</span> <span class="t-arg">PATH</span>] [options]</pre></div>
+      <h4>Options</h4>
+      <table class="data-table">
+        <thead><tr><th>Argument / Flag</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>RUN_ID</code> <span class="opt-badge">optional</span></td><td>string</td><td>—</td><td>run id of the artifact to export (ingest, preprocess, or profile). Omit to pick interactively.</td></tr>
+          <tr><td><code>--format / -f</code> <span class="opt-badge">optional</span></td><td>string</td><td>—</td><td>output format: <code>csv</code> <code>parquet</code> <code>json</code> <code>jsonl</code> <code>excel</code> <code>html</code></td></tr>
+          <tr><td><code>--output / -o</code> <span class="opt-badge">optional</span></td><td>path</td><td>auto</td><td>output file or directory. If omitted, a filename is generated automatically.</td></tr>
+          <tr><td><code>--delimiter / -d</code> <span class="opt-badge">optional</span></td><td>char</td><td><code>,</code></td><td>CSV column delimiter</td></tr>
+          <tr><td><code>--compression</code> <span class="opt-badge">optional</span></td><td>string</td><td><code>snappy</code></td><td>Parquet compression: <code>snappy</code> | <code>gzip</code> | <code>zstd</code> | <code>lz4</code> | <code>uncompressed</code></td></tr>
+          <tr><td><code>--partition-by</code> <span class="opt-badge">optional</span></td><td>string</td><td>—</td><td>Parquet partition columns, comma-separated (e.g. <code>dept,year</code>)</td></tr>
+          <tr><td><code>--sheet</code> <span class="opt-badge">optional</span></td><td>string</td><td><code>Sheet1</code></td><td>Excel sheet name</td></tr>
+          <tr><td><code>--filename</code> <span class="opt-badge">optional</span></td><td>string</td><td>auto</td><td>output filename when <code>--output</code> is a directory</td></tr>
+          <tr><td><code>--interactive / -i</code> <span class="opt-badge">optional</span></td><td>flag</td><td>on</td><td>prompt for missing values. Use <code>--no-interactive</code> / <code>-I</code> to disable for CI.</td></tr>
+          <tr><td><code>--store</code> <span class="opt-badge">optional</span></td><td>path</td><td><code>.datapill</code></td><td>artifact store directory</td></tr>
+        </tbody>
+      </table>
+      <h4>Examples</h4>
+      <div class="code-block"><div class="code-block-header"><span class="code-block-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+      <pre><span class="t-comment"># fully interactive — pick artifact, format, and output path from prompts</span>
+<span class="t-prompt">$</span> dp export run
+
+<span class="t-comment"># ingest → CSV</span>
+<span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> csv <span class="t-flag">--output</span> <span class="t-arg">./employees.csv</span>
+
+<span class="t-comment"># ingest → Parquet, gzip compression</span>
+<span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> parquet <span class="t-flag">--output</span> <span class="t-arg">./out.parquet</span> <span class="t-flag">--compression</span> gzip
+
+<span class="t-comment"># ingest → partitioned Parquet (output must be a directory)</span>
+<span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> parquet <span class="t-flag">--output</span> <span class="t-arg">./out/</span> <span class="t-flag">--partition-by</span> <span class="t-arg">dept,year</span>
+
+<span class="t-comment"># ingest → Excel</span>
+<span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> excel <span class="t-flag">--output</span> <span class="t-arg">./employees.xlsx</span> <span class="t-flag">--sheet</span> <span class="t-arg">Employees</span>
+
+<span class="t-comment"># profile → HTML report</span>
+<span class="t-prompt">$</span> dp export run <span class="t-arg">47689b73</span> <span class="t-flag">--format</span> html <span class="t-flag">--output</span> <span class="t-arg">./report.html</span>
+
+<span class="t-comment"># auto output path — resolves to ./ingest_54bede20.csv</span>
+<span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> csv <span class="t-flag">--no-interactive</span>
+
+<span class="t-out">  output:  ./ingest_54bede20.csv</span>
+<span class="t-comment">
+# example output after a successful export</span>
+<span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> parquet <span class="t-flag">--output</span> <span class="t-arg">./out.parquet</span>
+
+<span class="t-out">── output ───────────────────────────────────────────
+  path:    ./out.parquet
+  size:    4.2 MB
+  format:  parquet
+  options: compression=snappy</span></pre></div>
+      <div class="notice info">
+        <div class="notice-title">ℹ️ Format restrictions by artifact type</div>
+        <strong>profile</strong> artifacts only support <code>json</code> and <code>html</code>.
+        <strong>ingest</strong> and <strong>preprocess</strong> artifacts support <code>csv</code>, <code>parquet</code>, <code>json</code>, <code>jsonl</code>, and <code>excel</code>.
+        Passing the wrong format produces a clear validation error before any data is read.
+      </div>
+      <div class="notice tip">
+        <div class="notice-title">💡 Extension mismatch</div>
+        If <code>--output</code> has an extension that does not match <code>--format</code>, the CLI will report the error and suggest the correct path:
+        <code>→ try: --output ./data.csv</code>
+      </div>
+    </section>
+
+    <section id="export-formats">
+      <h3>export formats</h3>
+      <p>List all supported export formats with their file extensions and available options.</p>
+      <div class="code-block"><div class="code-block-header"><span class="code-block-lang">synopsis</span></div>
+      <pre><span class="t-cmd">dp export formats</span></pre></div>
+      <h4>Example</h4>
+      <div class="code-block"><div class="code-block-header"><span class="code-block-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+      <pre><span class="t-prompt">$</span> dp export formats
+
+<span class="t-out">── data formats ─────────────────────────────────────────────────────────────────────────
+  format    extension   options
+  csv       .csv        --delimiter (default ,)
+  parquet   .parquet    --compression snappy|gzip|zstd|lz4|uncompressed  --partition-by col1,col2
+  json      .json       —
+  jsonl     .jsonl      —
+  excel     .xlsx       --sheet (default Sheet1)
+
+── profile formats ──────────────────────────────────────────────────────────────────────
+  format    extension   notes
+  json      .json       raw profile result as JSON
+  html      .html       standalone HTML report</span></pre></div>
+    </section>
+
+<section id="sources">
       <h2>Supported Sources</h2>
       <p>Each source type maps to a connector. Pass its key as the <code>SOURCE</code> argument to any <code>ingest</code> command.</p>
       <div class="source-grid">

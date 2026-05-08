@@ -78,7 +78,7 @@ Expected output:
 ============================================================
 datapill  -  seeding test data
 ============================================================
-→ Configs  ✓ tests/fixtures/configs/  (8 config files)
+-> Configs  ✓ tests/fixtures/configs/  (8 config files)
            ✓ tests/fixtures/ops/       (4 ops files)
 
 Generating DataFrames…
@@ -94,17 +94,17 @@ Generating DataFrames…
   generating departments…
   ✓ total rows across all tables: 1,385,750+
 
-→ Local files  employees, products, customers, orders, transactions,
+-> Local files  employees, products, customers, orders, transactions,
                events, logs, reviews, inventory, departments
-               → csv + parquet + ndjson per table
-               → employees_by_dept/  (8 parquet partition files)
-               → orders_by_month/    (~60 parquet partition files)
-               → employees_dirty.csv (injected nulls/bad values)
-→ SQLite    ✓ tests/fixtures/test.db  (9 tables)
-→ PostgreSQL ✓ (9 tables)
-→ MySQL     ✓ (9 tables)
-→ MinIO/S3  ✓ data/{table}.{csv,parquet,ndjson} per table
-→ Kafka     ✓ multiple topics seeded
+               -> csv + parquet + ndjson per table
+               -> employees_by_dept/  (8 parquet partition files)
+               -> orders_by_month/    (~60 parquet partition files)
+               -> employees_dirty.csv (injected nulls/bad values)
+-> SQLite    ✓ tests/fixtures/test.db  (9 tables)
+-> PostgreSQL ✓ (9 tables)
+-> MySQL     ✓ (9 tables)
+-> MinIO/S3  ✓ data/{table}.{csv,parquet,ndjson} per table
+-> Kafka     ✓ multiple topics seeded
 ============================================================
 done - 1,385,750+ total rows seeded across 10 tables
 ```
@@ -365,7 +365,89 @@ dp profile warnings <PROFILE_RUN_ID> --severity warn
 
 ---
 
-## 8. Manage artifacts
+
+## 8. Export an artifact
+
+Export any ingest, preprocess, or profile artifact to a file. Use `--format` and `--output` for
+non-interactive mode, or omit them to enter guided prompts.
+
+### Non-interactive (scripting / CI)
+
+```bash
+# ingest -> CSV
+dp export run <INGEST_RUN_ID> --format csv --output ./employees.csv
+
+# ingest -> Parquet with gzip compression
+dp export run <INGEST_RUN_ID> --format parquet --output ./employees.parquet --compression gzip
+
+# ingest -> Parquet partitioned by department
+dp export run <INGEST_RUN_ID> --format parquet --output ./out/ --partition-by dept
+
+# ingest -> Excel with a custom sheet name
+dp export run <INGEST_RUN_ID> --format excel --output ./employees.xlsx --sheet Employees
+
+# ingest -> JSONL
+dp export run <INGEST_RUN_ID> --format jsonl --output ./employees.jsonl
+
+# profile -> standalone HTML report
+dp export run <PROFILE_RUN_ID> --format html --output ./report.html
+
+# profile -> raw JSON
+dp export run <PROFILE_RUN_ID> --format json --output ./report.json
+
+# disable interactive prompts (for CI)
+dp export run <INGEST_RUN_ID> --format csv --output ./out.csv --no-interactive
+```
+
+### Interactive mode (default)
+
+Omit any required argument and the CLI will prompt you:
+
+```bash
+# no arguments -> picks artifact from list, then prompts format and output path
+dp export run
+
+# artifact known, format and output omitted -> prompts for both
+dp export run <INGEST_RUN_ID>
+```
+
+### Smart output default
+
+When `--output` is omitted in non-interactive mode, datapill resolves a filename automatically:
+
+```
+./ingest_54bede20.csv
+./preprocess_a1b2c3d4.parquet
+./profile_47689b73.html
+```
+
+### List supported formats
+
+```bash
+dp export formats
+```
+
+Expected output:
+
+```
+── data formats ───────────────────────────────────────────
+  format    extension   options
+  csv       .csv        --delimiter (default ,)
+  parquet   .parquet    --compression snappy|gzip|zstd|lz4|uncompressed  --partition-by col1,col2
+  json      .json       -
+  jsonl     .jsonl      -
+  excel     .xlsx       --sheet (default Sheet1)
+
+── profile formats ────────────────────────────────────────
+  format    extension   notes
+  json      .json       raw profile result as JSON
+  html      .html       standalone HTML report
+```
+
+> **Note:** profile artifacts (`dp profile run`) only accept `json` and `html` formats.
+> Data artifacts (ingest / preprocess) accept the five data formats above.
+
+## 9. Manage artifacts
 
 ```bash
 # list all artifacts (most recent first)
@@ -396,7 +478,7 @@ dp artifact purge --samples-only --yes
 
 ---
 
-## 9. Tear down
+## 10. Tear down
 
 ```bash
 # stop containers and remove volumes
