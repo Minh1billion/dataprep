@@ -124,27 +124,36 @@ Run `ingest check` against each source before doing a full ingest. All should pr
 ```bash
 dp ingest check local \
     --config tests/fixtures/configs/local.json \
-    --path   data.parquet
+    --path   data.parquet -I
 
 dp ingest check sqlite \
-    --config tests/fixtures/configs/sqlite.json
+    --config tests/fixtures/configs/sqlite.json -I
 
 dp ingest check postgres \
-    --config tests/fixtures/configs/postgres.json
+    --config tests/fixtures/configs/postgres.json -I
 
 dp ingest check mysql \
-    --config tests/fixtures/configs/mysql.json
+    --config tests/fixtures/configs/mysql.json -I
 
 dp ingest check s3 \
-    --config tests/fixtures/configs/s3.json
+    --config tests/fixtures/configs/s3.json -I
 
 dp ingest check kafka \
-    --config tests/fixtures/configs/kafka.json
+    --config tests/fixtures/configs/kafka.json -I
+
+# hoặc để CLI hỏi từng field (không cần config file)
+dp ingest check postgres
+dp ingest check mysql
 ```
 
 ---
 
 ## 5. Run ingestions
+
+`dp ingest run` hỗ trợ hai mode:
+
+- **CLI flags** (`-I` / `--no-interactive`): truyền `--config` + options thẳng, không hỏi gì thêm. Dùng cho scripting/CI.
+- **Interactive** (mặc định, không có `-I`): nếu thiếu `--config` hoặc thiếu options, CLI sẽ hỏi từng field, hiển thị rõ required/optional và default.
 
 ### Local file
 
@@ -154,14 +163,14 @@ dp ingest run local \
     --config      tests/fixtures/configs/local.json \
     --path        data.parquet \
     --materialize \
-    --schema
+    --schema -I
 
 # ingest from any seeded table file
 dp ingest run local \
     --config      tests/fixtures/configs/local.json \
     --path        orders.parquet \
     --materialize \
-    --schema
+    --schema -I
 
 # sample a large table
 dp ingest run local \
@@ -169,13 +178,16 @@ dp ingest run local \
     --path        events.csv \
     --sample \
     --sample-size 5000 \
-    --schema
+    --schema -I
 
 # ingest dirty CSV for testing clean ops downstream
 dp ingest run local \
     --config      tests/fixtures/configs/local_dirty.json \
     --path        employees_dirty.csv \
-    --schema
+    --schema -I
+
+# interactive - CLI hỏi base_path rồi file path
+dp ingest run local
 ```
 
 ### SQLite
@@ -185,12 +197,15 @@ dp ingest run sqlite \
     --config      tests/fixtures/configs/sqlite.json \
     --table       employees \
     --materialize \
-    --schema
+    --schema -I
 
 # custom query
 dp ingest run sqlite \
     --config tests/fixtures/configs/sqlite.json \
-    --query  "SELECT dept, COUNT(*) AS n FROM employees GROUP BY dept"
+    --query  "SELECT dept, COUNT(*) AS n FROM employees GROUP BY dept" -I
+
+# interactive - CLI hỏi path .db rồi table/query
+dp ingest run sqlite
 ```
 
 ### PostgreSQL
@@ -200,14 +215,18 @@ dp ingest run postgres \
     --config      tests/fixtures/configs/postgres.json \
     --table       employees \
     --materialize \
-    --schema
+    --schema -I
 
 # streaming with batch-size
 dp ingest run postgres \
     --config      tests/fixtures/configs/postgres.json \
     --table       employees \
     --batch-size  50 \
-    --materialize
+    --materialize -I
+
+# interactive - CLI hỏi host/port/database/user/password rồi table/query
+# nhớ nhập port 5433 (bukan default 5432)
+dp ingest run postgres
 ```
 
 ### MySQL
@@ -217,7 +236,10 @@ dp ingest run mysql \
     --config      tests/fixtures/configs/mysql.json \
     --table       employees \
     --materialize \
-    --schema
+    --schema -I
+
+# interactive - nhớ nhập port 3307
+dp ingest run mysql
 ```
 
 ### Amazon S3 (MinIO)
@@ -227,31 +249,56 @@ dp ingest run mysql \
 dp ingest run s3 \
     --config tests/fixtures/configs/s3.json \
     --path   data/employees.parquet \
-    --materialize
+    --materialize -I
 
 # ingest CSV
 dp ingest run s3 \
     --config tests/fixtures/configs/s3.json \
     --path   data/employees.csv \
     --sample \
-    --sample-size 30
+    --sample-size 30 -I
+
+# interactive - CLI hỏi bucket/region/keys/endpoint rồi object key
+dp ingest run s3
 ```
 
 ### Kafka
 
 ```bash
-# consume all 100 seeded messages
+# consume all seeded messages
 dp ingest run kafka \
     --config tests/fixtures/configs/kafka.json \
     --topic  employees \
-    --materialize
+    --materialize -I
 
 # sample - stops after 20 messages
 dp ingest run kafka \
     --config      tests/fixtures/configs/kafka.json \
     --topic       employees \
     --sample \
-    --sample-size 20
+    --sample-size 20 -I
+
+# interactive - CLI hỏi brokers (comma-separated) rồi topic
+dp ingest run kafka
+```
+
+### REST API
+
+```bash
+dp ingest run rest \
+    --config   tests/fixtures/configs/rest_api.json \
+    --endpoint /posts -I
+
+# sample
+dp ingest run rest \
+    --config      tests/fixtures/configs/rest_api.json \
+    --endpoint    /comments \
+    --sample \
+    --sample-size 50 \
+    --schema -I
+
+# interactive - CLI hỏi base_url, auth, pagination rồi endpoint
+dp ingest run rest
 ```
 
 Each successful ingest prints a `run_id` (e.g. `a1b2c3d4`). Save the IDs you want to profile in the next section.

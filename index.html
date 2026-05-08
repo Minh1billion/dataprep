@@ -282,7 +282,7 @@ Commands:
 
     <section id="quickstart">
       <h2>Quick Start</h2>
-      <p>The following steps walk you through ingesting a local CSV/Parquet file, profiling it, and inspecting the results — no database required.</p>
+      <p>The following steps walk you through ingesting a local CSV/Parquet file, profiling it, and inspecting the results - no database required.</p>
       <ol class="steps">
         <li>
           <div class="step-body">
@@ -394,14 +394,14 @@ Commands:
       <p>Read data from a source and optionally store it as a versioned artifact.</p>
       <div class="code-block">
         <div class="code-block-header"><span class="code-block-lang">synopsis</span></div>
-        <pre><span class="t-cmd">dp ingest run</span> <span class="t-arg">SOURCE</span> <span class="t-flag">--config</span> <span class="t-arg">FILE</span> [OPTIONS]</pre>
+        <pre><span class="t-cmd">dp ingest run</span> <span class="t-arg">SOURCE</span> [<span class="t-flag">--config</span> <span class="t-arg">FILE</span>] [OPTIONS]</pre>
       </div>
       <h4>Options</h4>
             <table class="data-table">
         <thead><tr><th>Argument / Flag</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
           <tr><td><code>SOURCE</code> <span class="req-badge">required</span></td><td>string</td><td>…</td><td>source type: postgres, mysql, sqlite, s3, local, kafka, rest</td></tr>
-          <tr><td><code>--config / -c</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>path to config .json file (required for postgres, mysql, sqlite, kafka, rest, s3; optional for local)</td></tr>
+          <tr><td><code>--config / -c</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>path to config .json file. If omitted, the CLI prompts for each connection field interactively.</td></tr>
           <tr><td><code>--table / -t</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>table name (postgres, mysql, sqlite)</td></tr>
           <tr><td><code>--query / -q</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>raw SQL query (postgres, mysql, sqlite)</td></tr>
           <tr><td><code>--topic</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>kafka topic</td></tr>
@@ -415,6 +415,7 @@ Commands:
           <tr><td><code>--store</code> <span class="opt-badge">optional</span></td><td>string</td><td>.datapill</td><td>artifact store directory</td></tr>
           <tr><td><code>--schema</code> <span class="opt-badge">optional</span></td><td>flag</td><td>false</td><td>print column schema after ingest</td></tr>
           <tr><td><code>--mkdir</code> <span class="opt-badge">optional</span></td><td>flag</td><td>false</td><td>create base_path directory if it does not exist (local source only)</td></tr>
+          <tr><td><code>--interactive / -i</code> <span class="opt-badge">optional</span></td><td>flag</td><td>true</td><td>prompt for missing config fields and options. Pass <code>-I</code> / <code>--no-interactive</code> to disable for scripting or CI.</td></tr>
         </tbody>
       </table>
 
@@ -424,6 +425,7 @@ Commands:
         <button class="tab-btn" onclick="switchTab(this,'t2')">Table name</button>
         <button class="tab-btn" onclick="switchTab(this,'t3')">Sample only</button>
         <button class="tab-btn" onclick="switchTab(this,'t4')">S3 file</button>
+        <button class="tab-btn" onclick="switchTab(this,'t5')">Interactive</button>
       </div>
       <div id="t1" class="tab-pane active">
         <div class="code-block"><div class="code-block-header"><span class="code-block-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
@@ -456,19 +458,60 @@ Commands:
     <span class="t-flag">--path</span>   <span class="t-str">"data/2026/orders.parquet"</span> \
     <span class="t-flag">--materialize</span></pre></div>
       </div>
+      <div id="t5" class="tab-pane">
+        <div class="code-block"><div class="code-block-header"><span class="code-block-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="t-prompt">$</span> dp ingest run postgres
+<span class="t-out">- POSTGRES CONNECTION
+--------------------------------------------------------------------------------
+field              required   default   hint
+────────────────────────────────────────────────────────────────────────────
+host               yes        -         e.g. localhost
+port               no         5432
+database           yes        -
+user               yes        -
+password           yes        -         hidden
+schema             no         public
+ssl                no         -         disable | require | verify-full
+connect_timeout    no         10.0      seconds</span>
+
+  host * (): <span style="color:#e6edf3">localhost</span>
+  port (5432): <span style="color:#e6edf3">5433</span>
+  database * (): <span style="color:#e6edf3">testdb</span>
+  user * (): <span style="color:#e6edf3">testuser</span>
+  password  *: <span style="color:#e6edf3">••••••••</span>
+  schema (public):
+  ssl ():
+  connect_timeout (10.0):
+<span class="t-out">- POSTGRES OPTIONS
+────────────────────────────────────────────────────────────────────────────</span>
+  table or SQL query * (): <span style="color:#e6edf3">employees</span>
+<span class="t-ok">[OK] </span><span class="t-out">connected  8.4 ms</span>
+<span class="t-ok">[OK] </span><span class="t-out">150,756 rows  21 cols</span>
+<span class="t-out">- RUN
+  run:  <span class="t-key">a1b2c3d4efgh5678</span>
+  ref:  <span class="t-key">ingest-3</span></span></pre></div>
+      </div>
     </section>
 
     <section id="ingest-check">
       <h3>ingest check</h3>
       <p>Test a connector's credentials and network reachability without ingesting any data. Reports round-trip latency on success.</p>
       <div class="code-block"><div class="code-block-header"><span class="code-block-lang">synopsis</span></div>
-      <pre><span class="t-cmd">dp ingest check</span> <span class="t-arg">SOURCE</span> <span class="t-flag">--config</span> <span class="t-arg">FILE</span></pre></div>
+      <pre><span class="t-cmd">dp ingest check</span> <span class="t-arg">SOURCE</span> [<span class="t-flag">--config</span> <span class="t-arg">FILE</span>]</pre></div>
       <div class="code-block"><div class="code-block-header"><span class="code-block-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
-      <pre><span class="t-prompt">$</span> dp ingest check kafka --config kafka.json
-<span class="t-ok">  ✔ connected  </span><span class="t-out">latency 12ms</span>
+      <pre><span class="t-prompt">$</span> dp ingest check kafka --config kafka.json -I
+<span class="t-ok">  ✔ connected  </span><span class="t-out">12ms</span>
 
-<span class="t-prompt">$</span> dp ingest check postgres --config bad.json
-<span class="t-err">  ✖ connection failed: password authentication failed for user "analyst"</span></pre></div>
+<span class="t-prompt">$</span> dp ingest check postgres --config bad.json -I
+<span class="t-err">  ✖ connection failed: password authentication failed for user "analyst"</span>
+
+<span class="t-prompt">$</span> dp ingest check postgres
+<span class="t-out">  host * (): </span><span style="color:#e6edf3">localhost</span>
+<span class="t-out">  port (5432): </span><span style="color:#e6edf3">5433</span>
+<span class="t-out">  database * (): </span><span style="color:#e6edf3">testdb</span>
+<span class="t-out">  user * (): </span><span style="color:#e6edf3">testuser</span>
+<span class="t-out">  password  *: </span><span style="color:#e6edf3">••••••••</span>
+<span class="t-ok">  ✔ connected  </span><span class="t-out">8ms</span></pre></div>
     
       <h4>Options</h4>
             <table class="data-table">
@@ -478,6 +521,7 @@ Commands:
           <tr><td><code>--config / -c</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>path to config .json file</td></tr>
           <tr><td><code>--path / -p</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>file path (for local source)</td></tr>
           <tr><td><code>--mkdir</code> <span class="opt-badge">optional</span></td><td>flag</td><td>false</td><td>create base_path directory if it does not exist (local source only)</td></tr>
+          <tr><td><code>--interactive / -i</code> <span class="opt-badge">optional</span></td><td>flag</td><td>true</td><td>prompt for missing connection fields. Pass <code>-I</code> / <code>--no-interactive</code> to disable.</td></tr>
         </tbody>
       </table>
 </section>
@@ -545,7 +589,7 @@ sqlite</span></pre></div>
         <tbody>
           <tr><td><code>RUN_ID</code> <span class="req-badge">required</span></td><td>string</td><td>…</td><td>run id of the artifact to delete</td></tr>
           <tr><td><code>--yes / -y</code> <span class="opt-badge">optional</span></td><td>flag</td><td>false</td><td>skip confirmation prompt</td></tr>
-          <tr><td><code>--cascade</code> <span class="opt-badge">optional</span></td><td>flag</td><td>false</td><td>also delete all child artifacts (leaf → root order)</td></tr>
+          <tr><td><code>--cascade</code> <span class="opt-badge">optional</span></td><td>flag</td><td>false</td><td>also delete all child artifacts (leaf -> root order)</td></tr>
           <tr><td><code>--store</code> <span class="opt-badge">optional</span></td><td>string</td><td>.datapill</td><td>artifact store directory</td></tr>
         </tbody>
       </table>
@@ -559,7 +603,7 @@ sqlite</span></pre></div>
 <span class="t-prompt">$</span> dp artifact delete 0000ffff --yes
 <span class="t-err">  [FAIL] cannot delete 0000ffff: has 2 child artifact(s): 1111aaaa, 2222bbbb</span>
 
-<span class="t-comment"># cascade — shows subtree preview, then deletes leaf → root</span>
+<span class="t-comment"># cascade - shows subtree preview, then deletes leaf -> root</span>
 <span class="t-prompt">$</span> dp artifact delete 0000ffff --cascade
 <span class="t-out">  will delete 3 artifact(s):
     2222bbbb  profile
@@ -575,7 +619,7 @@ confirm? [y/N]:</span> y
 
     <section id="artifact-purge">
       <h3>artifact purge</h3>
-      <p>Bulk-delete root artifacts and their entire subtrees, keeping the <em>N</em> most recent roots. <code>--keep</code> counts <strong>root artifacts</strong> (ingests with no parent), not individual artifact records — so <code>--keep 3</code> always preserves 3 complete lineage trees.</p>
+      <p>Bulk-delete root artifacts and their entire subtrees, keeping the <em>N</em> most recent roots. <code>--keep</code> counts <strong>root artifacts</strong> (ingests with no parent), not individual artifact records - so <code>--keep 3</code> always preserves 3 complete lineage trees.</p>
       <div class="code-block"><div class="code-block-header"><span class="code-block-lang">synopsis</span></div>
       <pre><span class="t-cmd">dp artifact purge</span> [<span class="t-flag">--pipeline</span> <span class="t-arg">NAME</span>] [<span class="t-flag">--keep</span> <span class="t-arg">N</span>] [<span class="t-flag">--samples-only</span>] [<span class="t-flag">--yes</span>] [<span class="t-flag">--store</span> <span class="t-arg">PATH</span>]</pre></div>
       <h4>Options</h4>
@@ -778,7 +822,7 @@ confirm? [y/N]:</span> y
 <span class="t-comment"># one-hot encode a categorical column</span>
 <span class="t-prompt">$</span> dp preprocess run <span class="t-arg">0f34bcc3</span> --op <span class="t-str">"transform.encode:col=dept:method=onehot"</span></pre></div>
       <h4>Ops JSON file format</h4>
-      <p>A JSON ops file is an array of op objects — the same keys used in inline format, but as structured JSON:</p>
+      <p>A JSON ops file is an array of op objects - the same keys used in inline format, but as structured JSON:</p>
       <div class="code-block"><div class="code-block-header"><span class="code-block-lang">clean_employees.json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
       <pre>[
   { <span class="t-key">"group"</span>: <span class="t-str">"clean"</span>,     <span class="t-key">"type"</span>: <span class="t-str">"drop_null"</span>,     <span class="t-key">"cols"</span>: [<span class="t-str">"email"</span>, <span class="t-str">"salary"</span>] },
@@ -793,7 +837,7 @@ confirm? [y/N]:</span> y
 
     <section id="profile">
       <h2>datapill profile</h2>
-      <p>Profile a dataset artifact — computes column statistics, histograms, correlations, and data quality warnings.</p>
+      <p>Profile a dataset artifact - computes column statistics, histograms, correlations, and data quality warnings.</p>
     </section>
 
     <section id="profile-run">
@@ -900,7 +944,7 @@ confirm? [y/N]:</span> y
 
     <section id="export-run">
       <h3>export run</h3>
-      <p>Export an artifact to a file. <code>RUN_ID</code>, <code>--format</code>, and <code>--output</code> are optional —
+      <p>Export an artifact to a file. <code>RUN_ID</code>, <code>--format</code>, and <code>--output</code> are optional -
       omitting any of them triggers an interactive prompt.</p>
       <div class="code-block"><div class="code-block-header"><span class="code-block-lang">synopsis</span></div>
       <pre><span class="t-cmd">dp export run</span> [<span class="t-arg">RUN_ID</span>] [<span class="t-flag">--format</span> <span class="t-arg">FMT</span>] [<span class="t-flag">--output</span> <span class="t-arg">PATH</span>] [options]</pre></div>
@@ -908,12 +952,12 @@ confirm? [y/N]:</span> y
       <table class="data-table">
         <thead><tr><th>Argument / Flag</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>RUN_ID</code> <span class="opt-badge">optional</span></td><td>string</td><td>—</td><td>run id of the artifact to export (ingest, preprocess, or profile). Omit to pick interactively.</td></tr>
-          <tr><td><code>--format / -f</code> <span class="opt-badge">optional</span></td><td>string</td><td>—</td><td>output format: <code>csv</code> <code>parquet</code> <code>json</code> <code>jsonl</code> <code>excel</code> <code>html</code></td></tr>
+          <tr><td><code>RUN_ID</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>run id of the artifact to export (ingest, preprocess, or profile). Omit to pick interactively.</td></tr>
+          <tr><td><code>--format / -f</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>output format: <code>csv</code> <code>parquet</code> <code>json</code> <code>jsonl</code> <code>excel</code> <code>html</code></td></tr>
           <tr><td><code>--output / -o</code> <span class="opt-badge">optional</span></td><td>path</td><td>auto</td><td>output file or directory. If omitted, a filename is generated automatically.</td></tr>
           <tr><td><code>--delimiter / -d</code> <span class="opt-badge">optional</span></td><td>char</td><td><code>,</code></td><td>CSV column delimiter</td></tr>
           <tr><td><code>--compression</code> <span class="opt-badge">optional</span></td><td>string</td><td><code>snappy</code></td><td>Parquet compression: <code>snappy</code> | <code>gzip</code> | <code>zstd</code> | <code>lz4</code> | <code>uncompressed</code></td></tr>
-          <tr><td><code>--partition-by</code> <span class="opt-badge">optional</span></td><td>string</td><td>—</td><td>Parquet partition columns, comma-separated (e.g. <code>dept,year</code>)</td></tr>
+          <tr><td><code>--partition-by</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>Parquet partition columns, comma-separated (e.g. <code>dept,year</code>)</td></tr>
           <tr><td><code>--sheet</code> <span class="opt-badge">optional</span></td><td>string</td><td><code>Sheet1</code></td><td>Excel sheet name</td></tr>
           <tr><td><code>--filename</code> <span class="opt-badge">optional</span></td><td>string</td><td>auto</td><td>output filename when <code>--output</code> is a directory</td></tr>
           <tr><td><code>--interactive / -i</code> <span class="opt-badge">optional</span></td><td>flag</td><td>on</td><td>prompt for missing values. Use <code>--no-interactive</code> / <code>-I</code> to disable for CI.</td></tr>
@@ -922,25 +966,25 @@ confirm? [y/N]:</span> y
       </table>
       <h4>Examples</h4>
       <div class="code-block"><div class="code-block-header"><span class="code-block-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
-      <pre><span class="t-comment"># fully interactive — pick artifact, format, and output path from prompts</span>
+      <pre><span class="t-comment"># fully interactive - pick artifact, format, and output path from prompts</span>
 <span class="t-prompt">$</span> dp export run
 
-<span class="t-comment"># ingest → CSV</span>
+<span class="t-comment"># ingest -> CSV</span>
 <span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> csv <span class="t-flag">--output</span> <span class="t-arg">./employees.csv</span>
 
-<span class="t-comment"># ingest → Parquet, gzip compression</span>
+<span class="t-comment"># ingest -> Parquet, gzip compression</span>
 <span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> parquet <span class="t-flag">--output</span> <span class="t-arg">./out.parquet</span> <span class="t-flag">--compression</span> gzip
 
-<span class="t-comment"># ingest → partitioned Parquet (output must be a directory)</span>
+<span class="t-comment"># ingest -> partitioned Parquet (output must be a directory)</span>
 <span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> parquet <span class="t-flag">--output</span> <span class="t-arg">./out/</span> <span class="t-flag">--partition-by</span> <span class="t-arg">dept,year</span>
 
-<span class="t-comment"># ingest → Excel</span>
+<span class="t-comment"># ingest -> Excel</span>
 <span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> excel <span class="t-flag">--output</span> <span class="t-arg">./employees.xlsx</span> <span class="t-flag">--sheet</span> <span class="t-arg">Employees</span>
 
-<span class="t-comment"># profile → HTML report</span>
+<span class="t-comment"># profile -> HTML report</span>
 <span class="t-prompt">$</span> dp export run <span class="t-arg">47689b73</span> <span class="t-flag">--format</span> html <span class="t-flag">--output</span> <span class="t-arg">./report.html</span>
 
-<span class="t-comment"># auto output path — resolves to ./ingest_54bede20.csv</span>
+<span class="t-comment"># auto output path - resolves to ./ingest_54bede20.csv</span>
 <span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> csv <span class="t-flag">--no-interactive</span>
 
 <span class="t-out">  output:  ./ingest_54bede20.csv</span>
@@ -962,7 +1006,7 @@ confirm? [y/N]:</span> y
       <div class="notice tip">
         <div class="notice-title">💡 Extension mismatch</div>
         If <code>--output</code> has an extension that does not match <code>--format</code>, the CLI will report the error and suggest the correct path:
-        <code>→ try: --output ./data.csv</code>
+        <code>-> try: --output ./data.csv</code>
       </div>
     </section>
 
@@ -979,8 +1023,8 @@ confirm? [y/N]:</span> y
   format    extension   options
   csv       .csv        --delimiter (default ,)
   parquet   .parquet    --compression snappy|gzip|zstd|lz4|uncompressed  --partition-by col1,col2
-  json      .json       —
-  jsonl     .jsonl      —
+  json      .json       -
+  jsonl     .jsonl      -
   excel     .xlsx       --sheet (default Sheet1)
 
 ── profile formats ──────────────────────────────────────────────────────────────────────
@@ -1157,7 +1201,7 @@ df   = duckdb.sql(<span class="t-str">f"SELECT * FROM read_parquet('{path}') LIM
         <li>Chain multiple preprocess artifacts (each pointing to the previous as parent) to build multi-step pipelines tracked in full lineage.</li>
         <li>Schedule <code>artifact purge --keep 5</code> in CI to prevent unbounded disk growth.</li>
         <li>Use <code>artifact delete --cascade</code> to remove an entire lineage tree in one command.</li>
-        <li>Delete artifacts leaf-first when not using <code>--cascade</code> — deleting a parent while children exist will fail.</li>
+        <li>Delete artifacts leaf-first when not using <code>--cascade</code> - deleting a parent while children exist will fail.</li>
       </ul>
     </section>
   </main>
