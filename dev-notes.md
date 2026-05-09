@@ -150,10 +150,7 @@ dp ingest check mysql
 
 ## 5. Run ingestions
 
-`dp ingest run` supports two modes:
-
-- **CLI flags**: pass `--config` and all options directly, no prompts. Use for scripting/CI.
-- **Interactive** (default): if `--config` or options are omitted, the CLI prompts for each field, showing required/optional status and defaults.
+Pass `--config` and options directly for scripting/CI, or omit them to let the CLI prompt interactively for each field.
 
 ### Local file
 

@@ -415,7 +415,6 @@ Commands:
           <tr><td><code>--store</code> <span class="opt-badge">optional</span></td><td>string</td><td>.datapill</td><td>artifact store directory</td></tr>
           <tr><td><code>--schema</code> <span class="opt-badge">optional</span></td><td>flag</td><td>false</td><td>print column schema after ingest</td></tr>
           <tr><td><code>--mkdir</code> <span class="opt-badge">optional</span></td><td>flag</td><td>false</td><td>create base_path directory if it does not exist (local source only)</td></tr>
-          <tr><td><code>--interactive / -i</code> <span class="opt-badge">optional</span></td><td>flag</td><td>true</td><td>prompt for missing config fields and options. Pass <code>-I</code> / <code>--no-interactive</code> to disable for scripting or CI.</td></tr>
         </tbody>
       </table>
 
@@ -499,10 +498,10 @@ connect_timeout    no         10.0      seconds</span>
       <div class="code-block"><div class="code-block-header"><span class="code-block-lang">synopsis</span></div>
       <pre><span class="t-cmd">dp ingest check</span> <span class="t-arg">SOURCE</span> [<span class="t-flag">--config</span> <span class="t-arg">FILE</span>]</pre></div>
       <div class="code-block"><div class="code-block-header"><span class="code-block-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
-      <pre><span class="t-prompt">$</span> dp ingest check kafka --config kafka.json -I
+      <pre><span class="t-prompt">$</span> dp ingest check kafka --config kafka.json
 <span class="t-ok">  ✔ connected  </span><span class="t-out">12ms</span>
 
-<span class="t-prompt">$</span> dp ingest check postgres --config bad.json -I
+<span class="t-prompt">$</span> dp ingest check postgres --config bad.json
 <span class="t-err">  ✖ connection failed: password authentication failed for user "analyst"</span>
 
 <span class="t-prompt">$</span> dp ingest check postgres
@@ -521,7 +520,6 @@ connect_timeout    no         10.0      seconds</span>
           <tr><td><code>--config / -c</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>path to config .json file</td></tr>
           <tr><td><code>--path / -p</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>file path (for local source)</td></tr>
           <tr><td><code>--mkdir</code> <span class="opt-badge">optional</span></td><td>flag</td><td>false</td><td>create base_path directory if it does not exist (local source only)</td></tr>
-          <tr><td><code>--interactive / -i</code> <span class="opt-badge">optional</span></td><td>flag</td><td>true</td><td>prompt for missing connection fields. Pass <code>-I</code> / <code>--no-interactive</code> to disable.</td></tr>
         </tbody>
       </table>
 </section>
@@ -991,7 +989,6 @@ confirm? [y/N]:</span> y
           <tr><td><code>--partition-by</code> <span class="opt-badge">optional</span></td><td>string</td><td>-</td><td>Parquet partition columns, comma-separated (e.g. <code>dept,year</code>)</td></tr>
           <tr><td><code>--sheet</code> <span class="opt-badge">optional</span></td><td>string</td><td><code>Sheet1</code></td><td>Excel sheet name</td></tr>
           <tr><td><code>--filename</code> <span class="opt-badge">optional</span></td><td>string</td><td>auto</td><td>output filename when <code>--output</code> is a directory</td></tr>
-          <tr><td><code>--interactive / -i</code> <span class="opt-badge">optional</span></td><td>flag</td><td>on</td><td>prompt for missing values. Use <code>--no-interactive</code> / <code>-I</code> to disable for CI.</td></tr>
           <tr><td><code>--store</code> <span class="opt-badge">optional</span></td><td>path</td><td><code>.datapill</code></td><td>artifact store directory</td></tr>
         </tbody>
       </table>
@@ -1016,7 +1013,7 @@ confirm? [y/N]:</span> y
 <span class="t-prompt">$</span> dp export run <span class="t-arg">47689b73</span> <span class="t-flag">--format</span> html <span class="t-flag">--output</span> <span class="t-arg">./report.html</span>
 
 <span class="t-comment"># auto output path - resolves to ./ingest_54bede20.csv</span>
-<span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> csv <span class="t-flag">--no-interactive</span>
+<span class="t-prompt">$</span> dp export run <span class="t-arg">54bede20</span> <span class="t-flag">--format</span> csv
 
 <span class="t-out">  output:  ./ingest_54bede20.csv</span>
 <span class="t-comment">
