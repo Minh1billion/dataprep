@@ -49,25 +49,22 @@ class PreprocessPipeline(Pipeline):
         parent = context.artifact_store.get(self.parent_run_id)
         load_mode = "parquet" if (parent and parent.materialized) else "connector"
 
-        join_ops = [op for op in self.ops if op.get("type") == "join"]
-        regular_ops = [op for op in self.ops if op.get("type") != "join"]
-
         steps: list[dict[str, Any]] = [
             {"action": "load_data", "mode": load_mode, "parent_run_id": self.parent_run_id},
         ]
 
-        for op in join_ops:
-            right_parent = context.artifact_store.get(op["right_run_id"])
-            steps.append({
-                "action": "join",
-                "right_run_id": op["right_run_id"],
-                "right_load_mode": "parquet" if (right_parent and right_parent.materialized) else "connector",
-                "on": op.get("on"),
-                "how": op.get("how", "inner"),
-            })
-
-        for op in regular_ops:
-            steps.append({"action": "apply_op", "op": op})
+        for op in self.ops:
+            if op.get("type") == "join":
+                right_parent = context.artifact_store.get(op["right_run_id"])
+                steps.append({
+                    "action": "join",
+                    "right_run_id": op["right_run_id"],
+                    "right_load_mode": "parquet" if (right_parent and right_parent.materialized) else "connector",
+                    "on": op.get("on"),
+                    "how": op.get("how", "inner"),
+                })
+            else:
+                steps.append({"action": "apply_op", "op": op})
 
         if self.options.get("materialized"):
             steps.append({"action": "materialize", "format": "parquet"})
@@ -112,48 +109,48 @@ class PreprocessPipeline(Pipeline):
             payload={"rows": len(df), "columns": len(df.columns)},
         )
 
-        join_ops = [op for op in self.ops if op.get("type") == "join"]
-        for join_op in join_ops:
-            right_artifact = context.artifact_store.get(join_op["right_run_id"])
-            if right_artifact is None:
+        n_ops = len(self.ops)
+        collected_fit_params: dict[str, Any] = {}
+
+        for i, op in enumerate(self.ops):
+            if op.get("type") == "join":
+                right_artifact = context.artifact_store.get(op["right_run_id"])
+                if right_artifact is None:
+                    yield ProgressEvent(
+                        event_type=EventType.ERROR,
+                        message=f"join: artifact not found: {op['right_run_id']!r}",
+                    )
+                    return
+
                 yield ProgressEvent(
-                    event_type=EventType.ERROR,
-                    message=f"join: artifact not found: {join_op['right_run_id']!r}",
+                    event_type=EventType.PROGRESS,
+                    message=f"loading right side for join: {op['right_run_id']}",
+                    progress_pct=10.0 + (i / n_ops) * 75.0,
                 )
-                return
 
-            yield ProgressEvent(
-                event_type=EventType.PROGRESS,
-                message=f"loading right side for join: {join_op['right_run_id']}",
-                progress_pct=12.0,
-            )
+                try:
+                    right_df = await load_dataframe(right_artifact, context)
+                except Exception as exc:
+                    yield ProgressEvent(event_type=EventType.ERROR, message=f"join load failed: {exc}")
+                    return
+
+                df = df.join(
+                    right_df,
+                    on=op.get("on"),
+                    how=op.get("how", "inner"),
+                    suffix=op.get("suffix", "_right"),
+                )
+
+                yield ProgressEvent(
+                    event_type=EventType.PROGRESS,
+                    message=f"join complete - {len(df):,} rows",
+                    progress_pct=10.0 + ((i + 1) / n_ops) * 75.0,
+                    payload={"rows": len(df)},
+                )
+                continue
 
             try:
-                right_df = await load_dataframe(right_artifact, context)
-            except Exception as exc:
-                yield ProgressEvent(event_type=EventType.ERROR, message=f"join load failed: {exc}")
-                return
-
-            df = df.join(
-                right_df,
-                on=join_op.get("on"),
-                how=join_op.get("how", "inner"),
-                suffix=join_op.get("suffix", "_right"),
-            )
-
-            yield ProgressEvent(
-                event_type=EventType.PROGRESS,
-                message=f"join complete — {len(df):,} rows",
-                progress_pct=15.0,
-                payload={"rows": len(df)},
-            )
-
-        regular_ops = [op for op in self.ops if op.get("type") != "join"]
-        n_ops = len(regular_ops)
-
-        for i, op in enumerate(regular_ops):
-            try:
-                df = apply_op(df, op)
+                result = apply_op(df, op)
             except Exception as exc:
                 yield ProgressEvent(
                     event_type=EventType.ERROR,
@@ -161,7 +158,12 @@ class PreprocessPipeline(Pipeline):
                 )
                 return
 
-            pct = 15.0 + ((i + 1) / n_ops) * 75.0
+            df, fit_params = result
+            if fit_params:
+                key = f"{op.get('group')}.{op.get('type')}[{i}]"
+                collected_fit_params[key] = fit_params
+
+            pct = 10.0 + ((i + 1) / n_ops) * 75.0
             yield ProgressEvent(
                 event_type=EventType.PROGRESS,
                 message=f"applied {op.get('group')}.{op.get('type')} ({i + 1}/{n_ops})",
@@ -190,12 +192,6 @@ class PreprocessPipeline(Pipeline):
         context.artifact_store.save(artifact)
         context.artifact = artifact
 
-        fit_params = {
-            f"{op.get('group')}.{op.get('type')}[{i}]": op["fit_params"]
-            for i, op in enumerate(self.ops)
-            if op.get("fit_params")
-        }
-
         yield ProgressEvent(
             event_type=EventType.DONE,
             message="preprocess complete",
@@ -205,7 +201,7 @@ class PreprocessPipeline(Pipeline):
                 "ref": artifact.ref,
                 "rows": len(df),
                 "columns": len(df.columns),
-                **({"fit_params": fit_params} if fit_params else {}),
+                **({"fit_params": collected_fit_params} if collected_fit_params else {}),
             },
         )
 

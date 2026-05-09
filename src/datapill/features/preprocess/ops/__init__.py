@@ -118,15 +118,20 @@ _REQUIRED: dict[str, dict[str, list[str]]] = {
     },
 }
 
+_TUPLE_RETURN = {("transform", "standardize"), ("transform", "encode")}
 
-def apply_op(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
+
+def apply_op(df: pl.DataFrame, op: dict[str, Any]) -> tuple[pl.DataFrame, dict | None]:
     group = op.get("group")
     type_ = op.get("type")
     if group not in _DISPATCH:
         raise ValueError(f"unknown op group: {group!r}")
     if type_ not in _DISPATCH[group]:
         raise ValueError(f"unknown op type: {type_!r} in group {group!r}")
-    return _DISPATCH[group][type_](df, op)
+    result = _DISPATCH[group][type_](df, op)
+    if (group, type_) in _TUPLE_RETURN:
+        return result
+    return result, None
 
 
 def validate_op(op: dict[str, Any]) -> list[str]:

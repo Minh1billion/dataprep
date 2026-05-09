@@ -125,7 +125,7 @@ def show_profile(
         profile_result = artifact.options["profile_summary"]
 
     if profile_result is None:
-        err.print(Text("[FAIL] ", style=f"bold {RED}") + Text("no profile data found — artifact may have been created without materialization", style=RED))
+        err.print(Text("[FAIL] ", style=f"bold {RED}") + Text("no profile data found - artifact may have been created without materialization", style=RED))
         raise typer.Exit(1)
 
     summary = profile_result.get("summary", {})
@@ -134,7 +134,7 @@ def show_profile(
     dt.add_column(style=GRAY, no_wrap=True, min_width=18)
     dt.add_column(style=WHITE, no_wrap=True)
     dt.add_row("run", Text(artifact.run_id, style=f"bold {ORANGE}"))
-    dt.add_row("parent", Text(artifact.parent_run_id or "—", style=GRAY))
+    dt.add_row("parent", Text(artifact.parent_run_id or "-", style=GRAY))
     dt.add_row("rows", f"{summary.get('n_rows', 0):,}")
     dt.add_row("columns", str(summary.get('n_columns', 0)))
     dt.add_row("memory", f"{summary.get('memory_mb', 0):.2f} MB")

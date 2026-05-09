@@ -88,10 +88,16 @@ def date_diff(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
     col_b = op["col_b"]
     unit = op.get("unit", "day")
     out_col = op.get("out_col") or f"{col_a}_{col_b}_diff_{unit}"
-    return df.with_columns(
-        (pl.col(col_a) - pl.col(col_b)).dt.total_days().alias(out_col)
-        if unit == "day"
-        else (pl.col(col_a) - pl.col(col_b)).dt.total_hours().alias(out_col)
-        if unit == "hour"
-        else (pl.col(col_a) - pl.col(col_b)).dt.total_minutes().alias(out_col)
-    )
+    if unit == "day":
+        return df.with_columns(
+            (pl.col(col_a) - pl.col(col_b)).dt.total_days().alias(out_col)
+        )
+    if unit == "hour":
+        return df.with_columns(
+            (pl.col(col_a) - pl.col(col_b)).dt.total_hours().alias(out_col)
+        )
+    if unit == "minute":
+        return df.with_columns(
+            (pl.col(col_a) - pl.col(col_b)).dt.total_minutes().alias(out_col)
+        )
+    raise ValueError(f"date_diff: unsupported unit {unit!r}, expected 'day', 'hour', or 'minute'")

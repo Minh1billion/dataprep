@@ -4,7 +4,14 @@ import polars as pl
 
 
 def filter_rows(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
-    return df.filter(pl.Expr.deserialize(op["expr"].encode(), format="json"))
+    try:
+        expr = pl.Expr.deserialize(op["expr"].encode(), format="json")
+    except Exception as exc:
+        raise ValueError(f"filter_rows: invalid expr - {exc}") from exc
+    try:
+        return df.filter(expr)
+    except Exception as exc:
+        raise ValueError(f"filter_rows: failed to apply expr - {exc}") from exc
 
 
 def dedup(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:

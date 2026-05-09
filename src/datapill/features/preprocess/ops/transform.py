@@ -17,14 +17,14 @@ def normalize(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
     return df.with_columns(exprs)
 
 
-def standardize(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
+def standardize(df: pl.DataFrame, op: dict[str, Any]) -> tuple[pl.DataFrame, dict]:
     cols = op.get("cols") or df.columns
-    fit_params = op.get("fit_params", {})
+    fit_params = op.get("fit_params") or {}
     exprs = []
     computed: dict[str, dict] = {}
     for c in cols:
-        mean = fit_params.get(c, {}).get("mean") if fit_params else None
-        std = fit_params.get(c, {}).get("std") if fit_params else None
+        mean = fit_params.get(c, {}).get("mean")
+        std = fit_params.get(c, {}).get("std")
         if mean is None:
             mean = df[c].mean()
         if std is None:
@@ -34,8 +34,7 @@ def standardize(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
             exprs.append(pl.lit(0.0).alias(c))
         else:
             exprs.append(((pl.col(c) - mean) / std).alias(c))
-    op["fit_params"] = computed
-    return df.with_columns(exprs)
+    return df.with_columns(exprs), computed
 
 
 def log_transform(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
@@ -84,30 +83,27 @@ def power_transform(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
     return df.with_columns(exprs)
 
 
-def encode(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
+def encode(df: pl.DataFrame, op: dict[str, Any]) -> tuple[pl.DataFrame, dict]:
     col = op["col"]
     method = op.get("method", "onehot")
-    fit_params = op.get("fit_params", {})
+    fit_params = op.get("fit_params") or {}
 
     if method == "label":
         categories = fit_params.get("categories") or sorted(df[col].drop_nulls().unique().to_list())
         mapping = {v: i for i, v in enumerate(categories)}
-        op["fit_params"] = {"categories": categories}
-        return df.with_columns(pl.col(col).replace(mapping).cast(pl.Int32))
+        return df.with_columns(pl.col(col).replace(mapping).cast(pl.Int32)), {"categories": categories}
 
     if method == "onehot":
         categories = fit_params.get("categories") or sorted(df[col].drop_nulls().unique().to_list())
-        op["fit_params"] = {"categories": categories}
         exprs = [
             (pl.col(col) == cat).cast(pl.Int8).alias(f"{col}_{cat}")
             for cat in categories
         ]
-        return df.with_columns(exprs).drop(col)
+        return df.with_columns(exprs).drop(col), {"categories": categories}
 
     if method == "ordinal":
         mapping: dict = op["mapping"]
-        op["fit_params"] = {"mapping": mapping}
-        return df.with_columns(pl.col(col).replace(mapping).cast(pl.Int32))
+        return df.with_columns(pl.col(col).replace(mapping).cast(pl.Int32)), {"mapping": mapping}
 
     raise ValueError(f"unknown encode method: {method!r}")
 
@@ -115,4 +111,11 @@ def encode(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
 def math_expr(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
     out_col = op["out_col"]
     expr_str: str = op["expr"]
-    return df.with_columns(pl.eval(expr_str).alias(out_col))
+    allowed = {name: pl.col(name) for name in df.columns}
+    try:
+        result_expr = eval(compile(expr_str, "<expr>", "eval"), {"__builtins__": {}, "pl": pl}, allowed)
+    except Exception as exc:
+        raise ValueError(f"math_expr failed to evaluate expr: {exc}") from exc
+    if not isinstance(result_expr, pl.Expr):
+        raise ValueError(f"math_expr must return a polars Expr, got {type(result_expr).__name__!r}")
+    return df.with_columns(result_expr.alias(out_col))

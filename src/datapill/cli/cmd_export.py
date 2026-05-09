@@ -134,33 +134,25 @@ def run_export(
     sheet_name: Optional[str] = typer.Option(None, "--sheet", help="excel sheet name (default: Sheet1)"),
     filename: Optional[str] = typer.Option(None, "--filename", help="output filename when --output is a directory"),
     store_path: str = typer.Option(".datapill", "--store", help="artifact store directory"),
-    interactive: bool = typer.Option(True, "--interactive/--no-interactive", "-i/-I", help="prompt for missing values"),
 ) -> None:
     artifact_store = ArtifactStore(store_path)
     context = Context(artifact_store=artifact_store)
 
     if parent_run_id is None:
-        if not interactive:
-            err.print(Text("[FAIL] ", style=f"bold {RED}") + Text("parent_run_id is required (or use -i)", style=RED))
-            raise typer.Exit(1)
         parent_run_id = _pick_artifact(artifact_store)
 
     parent = artifact_store.get(parent_run_id)
     if parent is None:
         err.print(Text("[FAIL] ", style=f"bold {RED}") + Text(f"artifact not found: {parent_run_id!r}", style=RED))
-        if interactive:
-            if Confirm.ask(Text("  pick from available artifacts?", style=GRAY)):
-                parent_run_id = _pick_artifact(artifact_store)
-                parent = artifact_store.get(parent_run_id)
+        if Confirm.ask(Text("  pick from available artifacts?", style=GRAY)):
+            parent_run_id = _pick_artifact(artifact_store)
+            parent = artifact_store.get(parent_run_id)
         if parent is None:
             raise typer.Exit(1)
 
     is_profile = parent.pipeline == "profile"
 
     if format is None:
-        if not interactive:
-            err.print(Text("[FAIL] ", style=f"bold {RED}") + Text("--format is required (or use -i)", style=RED))
-            raise typer.Exit(1)
         format = _pick_format(is_profile)
 
     options: dict = {}
@@ -175,17 +167,13 @@ def run_export(
     if filename is not None:
         options["filename"] = filename
 
-    if interactive and not options and format in ("csv", "parquet", "excel"):
+    if not options and format in ("csv", "parquet", "excel"):
         if Confirm.ask(Text(f"  configure {format} options?", style=GRAY), default=False):
             options.update(_ask_format_options(format))
 
     if output is None:
         default_out = _default_output(parent.pipeline, parent_run_id, format)
-        if interactive:
-            output = Prompt.ask(Text("  output path", style=GRAY), default=default_out)
-        else:
-            output = default_out
-            out.print(Text("  output:  ", style=GRAY) + Text(output, style=ORANGE))
+        output = Prompt.ask(Text("  output path", style=GRAY), default=default_out)
 
     pipeline = ExportPipeline(
         parent_run_id=parent_run_id,

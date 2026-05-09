@@ -97,4 +97,11 @@ def sample(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
 def custom_expr(df: pl.DataFrame, op: dict[str, Any]) -> pl.DataFrame:
     out_col = op["out_col"]
     expr_str: str = op["expr"]
-    return df.with_columns(pl.eval(expr_str).alias(out_col))
+    allowed = {name: pl.col(name) for name in df.columns}
+    try:
+        result_expr = eval(compile(expr_str, "<expr>", "eval"), {"__builtins__": {}, "pl": pl}, allowed)
+    except Exception as exc:
+        raise ValueError(f"custom_expr failed to evaluate expr: {exc}") from exc
+    if not isinstance(result_expr, pl.Expr):
+        raise ValueError(f"custom_expr must return a polars Expr, got {type(result_expr).__name__!r}")
+    return df.with_columns(result_expr.alias(out_col))

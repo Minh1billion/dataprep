@@ -221,7 +221,7 @@ def _prompt_config(source: str) -> dict:
             try:
                 config[name] = cast(config[name])
             except (ValueError, TypeError):
-                err.print(Text(f"  invalid value for {name!r} — using default", style=YELLOW))
+                err.print(Text(f"  invalid value for {name!r} - using default", style=YELLOW))
                 config.pop(name, None)
 
     if source == "kafka" and "brokers" in config:
@@ -266,7 +266,7 @@ def _prompt_options(source: str) -> dict:
             try:
                 options["params"] = json.loads(val)
             except json.JSONDecodeError:
-                err.print(Text("  invalid JSON for params — skipping", style=YELLOW))
+                err.print(Text("  invalid JSON for params - skipping", style=YELLOW))
         elif val:
             options[f["name"]] = val
 
@@ -290,7 +290,6 @@ def run(
     store_path: str = typer.Option(".datapill", "--store", help="artifact store directory"),
     schema: bool = typer.Option(False, "--schema", help="print column schema after ingest"),
     mkdir: bool = typer.Option(False, "--mkdir", help="create base_path directory if it does not exist (local source only)"),
-    interactive: bool = typer.Option(True, "--interactive/--no-interactive", "-i/-I", help="prompt for missing values"),
 ) -> None:
     if source not in registry.sources():
         err.print(Text("[FAIL] ", style=f"bold {RED}") + Text(f"unknown source: {source!r}. available: {registry.sources()}", style=RED))
@@ -299,25 +298,16 @@ def run(
     connector_config: dict = {}
     options: dict = {}
 
-    needs_interactive_config = (
-        interactive
-        and config is None
-        and source in _CONFIG_REQUIRED_SOURCES
-    )
-    needs_interactive_local = (
-        interactive
-        and config is None
-        and source == "local"
-    )
-
     if config:
         connector_config = _load_config(config)
-    elif needs_interactive_config or needs_interactive_local:
+    elif source in _CONFIG_REQUIRED_SOURCES:
+        connector_config = _prompt_config(source)
+    elif source == "local":
         connector_config = _prompt_config(source)
 
     cli_has_options = any([table, query, topic, path, endpoint, params])
 
-    if not cli_has_options and interactive:
+    if not cli_has_options:
         prompted = _prompt_options(source)
         options.update(prompted)
     else:
@@ -397,7 +387,6 @@ def list_sources() -> None:
     ]
     for src, req, opts in rows:
         tbl.add_row(src, req, opts)
-    out.print(tbl)
     _rule()
 
 
@@ -407,7 +396,6 @@ def check_connection(
     config: Optional[str] = typer.Option(None, "--config", "-c", help="path to config .json file"),
     path: Optional[str] = typer.Option(None, "--path", "-p", help="file path (for local source)"),
     mkdir: bool = typer.Option(False, "--mkdir", help="create base_path directory if it does not exist (local source only)"),
-    interactive: bool = typer.Option(True, "--interactive/--no-interactive", "-i/-I", help="prompt for missing values"),
 ) -> None:
     if source not in registry.sources():
         err.print(Text("[FAIL] ", style=f"bold {RED}") + Text(f"unknown source: {source!r}", style=RED))
@@ -417,20 +405,15 @@ def check_connection(
 
     if config:
         connector_config = _load_config(config)
-    elif interactive and source in _CONFIG_REQUIRED_SOURCES:
-        connector_config = _prompt_config(source)
     elif source in _CONFIG_REQUIRED_SOURCES:
-        err.print(Text("[FAIL] ", style=f"bold {RED}") + Text(f"--config is required for source '{source}' (or use -i)", style=RED))
-        raise typer.Exit(1)
+        connector_config = _prompt_config(source)
+    elif source not in _CONFIG_REQUIRED_SOURCES and source != "local":
+        pass
 
     if source == "local":
         if not path and "base_path" not in connector_config:
-            if interactive:
-                raw = Prompt.ask(Text("  base_path", style=CYAN))
-                connector_config = {**connector_config, "base_path": raw, "mkdir": mkdir}
-            else:
-                err.print(Text("[FAIL] ", style=f"bold {RED}") + Text("--path or 'base_path' in config required for source 'local'", style=RED))
-                raise typer.Exit(1)
+            raw = Prompt.ask(Text("  base_path", style=CYAN))
+            connector_config = {**connector_config, "base_path": raw, "mkdir": mkdir}
         elif path:
             base_path, _ = _resolve_local_path(path, connector_config)
             connector_config = {**connector_config, "base_path": base_path, "mkdir": mkdir}
