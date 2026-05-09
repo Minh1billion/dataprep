@@ -192,7 +192,7 @@ def _pick_ops_interactively() -> list[dict]:
         type_tbl.add_column("required params", style=GRAY)
         for j, t in enumerate(type_names, 1):
             required = _REQUIRED[group][t]
-            type_tbl.add_row(str(j), t, ", ".join(required) if required else Text("", style=GRAY))
+            type_tbl.add_row(str(j), t, ", ".join(required) if required else Text("-", style=GRAY))
         out.print(type_tbl)
 
         while True:
@@ -526,6 +526,6 @@ def list_ops(
         t.add_column("example", style=WHITE)
         for type_ in _DISPATCH[g]:
             required = _REQUIRED[g][type_]
-            req_str = ", ".join(required) if required else Text("", style=GRAY)
+            req_str = ", ".join(required) if required else Text("-", style=GRAY)
             t.add_row(type_, req_str, examples.get((g, type_), ""))
         out.print(t)

@@ -124,24 +124,24 @@ Run `ingest check` against each source before doing a full ingest. All should pr
 ```bash
 dp ingest check local \
     --config tests/fixtures/configs/local.json \
-    --path   data.parquet -I
+    --path   employees.parquet
 
 dp ingest check sqlite \
-    --config tests/fixtures/configs/sqlite.json -I
+    --config tests/fixtures/configs/sqlite.json
 
 dp ingest check postgres \
-    --config tests/fixtures/configs/postgres.json -I
+    --config tests/fixtures/configs/postgres.json
 
 dp ingest check mysql \
-    --config tests/fixtures/configs/mysql.json -I
+    --config tests/fixtures/configs/mysql.json
 
 dp ingest check s3 \
-    --config tests/fixtures/configs/s3.json -I
+    --config tests/fixtures/configs/s3.json
 
 dp ingest check kafka \
-    --config tests/fixtures/configs/kafka.json -I
+    --config tests/fixtures/configs/kafka.json
 
-# hoặc để CLI hỏi từng field (không cần config file)
+# or let the CLI prompt for each field (no config file needed)
 dp ingest check postgres
 dp ingest check mysql
 ```
@@ -150,10 +150,10 @@ dp ingest check mysql
 
 ## 5. Run ingestions
 
-`dp ingest run` hỗ trợ hai mode:
+`dp ingest run` supports two modes:
 
-- **CLI flags** (`-I` / `--no-interactive`): truyền `--config` + options thẳng, không hỏi gì thêm. Dùng cho scripting/CI.
-- **Interactive** (mặc định, không có `-I`): nếu thiếu `--config` hoặc thiếu options, CLI sẽ hỏi từng field, hiển thị rõ required/optional và default.
+- **CLI flags**: pass `--config` and all options directly, no prompts. Use for scripting/CI.
+- **Interactive** (default): if `--config` or options are omitted, the CLI prompts for each field, showing required/optional status and defaults.
 
 ### Local file
 
@@ -161,16 +161,16 @@ dp ingest check mysql
 # full ingest - parquet
 dp ingest run local \
     --config      tests/fixtures/configs/local.json \
-    --path        data.parquet \
+    --path        employees.parquet \
     --materialize \
-    --schema -I
+    --schema
 
 # ingest from any seeded table file
 dp ingest run local \
     --config      tests/fixtures/configs/local.json \
     --path        orders.parquet \
     --materialize \
-    --schema -I
+    --schema
 
 # sample a large table
 dp ingest run local \
@@ -178,15 +178,15 @@ dp ingest run local \
     --path        events.csv \
     --sample \
     --sample-size 5000 \
-    --schema -I
+    --schema
 
 # ingest dirty CSV for testing clean ops downstream
 dp ingest run local \
     --config      tests/fixtures/configs/local_dirty.json \
     --path        employees_dirty.csv \
-    --schema -I
+    --schema
 
-# interactive - CLI hỏi base_path rồi file path
+# interactive - CLI prompts for base_path then file path
 dp ingest run local
 ```
 
@@ -197,14 +197,14 @@ dp ingest run sqlite \
     --config      tests/fixtures/configs/sqlite.json \
     --table       employees \
     --materialize \
-    --schema -I
+    --schema
 
 # custom query
 dp ingest run sqlite \
     --config tests/fixtures/configs/sqlite.json \
-    --query  "SELECT dept, COUNT(*) AS n FROM employees GROUP BY dept" -I
+    --query  "SELECT dept, COUNT(*) AS n FROM employees GROUP BY dept"
 
-# interactive - CLI hỏi path .db rồi table/query
+# interactive - CLI prompts for .db path then table/query
 dp ingest run sqlite
 ```
 
@@ -215,17 +215,17 @@ dp ingest run postgres \
     --config      tests/fixtures/configs/postgres.json \
     --table       employees \
     --materialize \
-    --schema -I
+    --schema
 
 # streaming with batch-size
 dp ingest run postgres \
     --config      tests/fixtures/configs/postgres.json \
     --table       employees \
     --batch-size  50 \
-    --materialize -I
+    --materialize
 
-# interactive - CLI hỏi host/port/database/user/password rồi table/query
-# nhớ nhập port 5433 (bukan default 5432)
+# interactive - CLI prompts for host/port/database/user/password then table/query
+# note: enter port 5433 (not the default 5432)
 dp ingest run postgres
 ```
 
@@ -236,9 +236,9 @@ dp ingest run mysql \
     --config      tests/fixtures/configs/mysql.json \
     --table       employees \
     --materialize \
-    --schema -I
+    --schema
 
-# interactive - nhớ nhập port 3307
+# interactive - note: enter port 3307
 dp ingest run mysql
 ```
 
@@ -249,16 +249,16 @@ dp ingest run mysql
 dp ingest run s3 \
     --config tests/fixtures/configs/s3.json \
     --path   data/employees.parquet \
-    --materialize -I
+    --materialize
 
 # ingest CSV
 dp ingest run s3 \
     --config tests/fixtures/configs/s3.json \
     --path   data/employees.csv \
     --sample \
-    --sample-size 30 -I
+    --sample-size 30
 
-# interactive - CLI hỏi bucket/region/keys/endpoint rồi object key
+# interactive - CLI prompts for bucket/region/keys/endpoint then object key
 dp ingest run s3
 ```
 
@@ -269,16 +269,16 @@ dp ingest run s3
 dp ingest run kafka \
     --config tests/fixtures/configs/kafka.json \
     --topic  employees \
-    --materialize -I
+    --materialize
 
 # sample - stops after 20 messages
 dp ingest run kafka \
     --config      tests/fixtures/configs/kafka.json \
     --topic       employees \
     --sample \
-    --sample-size 20 -I
+    --sample-size 20
 
-# interactive - CLI hỏi brokers (comma-separated) rồi topic
+# interactive - CLI prompts for brokers (comma-separated) then topic
 dp ingest run kafka
 ```
 
@@ -287,7 +287,7 @@ dp ingest run kafka
 ```bash
 dp ingest run rest \
     --config   tests/fixtures/configs/rest_api.json \
-    --endpoint /posts -I
+    --endpoint /posts
 
 # sample
 dp ingest run rest \
@@ -295,9 +295,9 @@ dp ingest run rest \
     --endpoint    /comments \
     --sample \
     --sample-size 50 \
-    --schema -I
+    --schema
 
-# interactive - CLI hỏi base_url, auth, pagination rồi endpoint
+# interactive - CLI prompts for base_url, auth, pagination then endpoint
 dp ingest run rest
 ```
 
@@ -374,6 +374,18 @@ dp preprocess ops --group compose
 
 Each successful preprocess run prints a `run_id`. You can chain preprocess steps (pass a preprocess `run_id` as the parent of another preprocess run), then profile the final artifact.
 
+### Interactive navigation
+
+When running `dp preprocess run` without `--op` or `--ops`, the CLI enters interactive mode. Two navigation commands are available at any prompt:
+
+| Input | Where | Effect |
+|---|---|---|
+| `undo` | group prompt | removes the last added op from the list |
+| `back` | op-type prompt | returns to group selection |
+| `back` | params prompt | returns to op-type selection within the same group |
+
+The current op list is printed before each group prompt so you always know where you are.
+
 ## 7. Profile an artifact
 
 Use the `run_id` from an ingest step above. Substitute `<RUN_ID>` accordingly.
@@ -443,7 +455,7 @@ dp export run <PROFILE_RUN_ID> --format html --output ./report.html
 dp export run <PROFILE_RUN_ID> --format json --output ./report.json
 
 # disable interactive prompts (for CI)
-dp export run <INGEST_RUN_ID> --format csv --output ./out.csv --no-interactive
+dp export run <INGEST_RUN_ID> --format csv --output ./out.csv
 ```
 
 ### Interactive mode (default)
